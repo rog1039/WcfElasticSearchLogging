@@ -10,10 +10,13 @@ namespace WCFESMessageLogging
 {
     public class MessageLogEntryService
     {
-        private MessageLoggingProcessorLoop messageLogProcessorLoop = new MessageLoggingProcessorLoop(1);
+        private readonly MessageCaptureSettings _settings;
+        private readonly MessageLoggingProcessorLoop _messageLogProcessingLoop;
 
-        public MessageLogEntryService()
+        public MessageLogEntryService(MessageCaptureSettings settings)
         {
+            _settings = settings;
+            _messageLogProcessingLoop = new MessageLoggingProcessorLoop(settings);
         }
 
         public MessageLogEntry CreateMessageLogEntry(ref Message request)
@@ -41,7 +44,7 @@ namespace WCFESMessageLogging
             }
 
             messageLogEntry.MarkOperationAsStarted();
-            messageLogProcessorLoop.EnqueueIncomingItem(messageLogEntry);
+            _messageLogProcessingLoop.EnqueueIncomingItem(messageLogEntry);
             return messageLogEntry;
         }
 
@@ -85,7 +88,8 @@ namespace WCFESMessageLogging
                 var messageToString = MessageToString(ref reply);
                 messageCorrelation.ResponseSize = messageToString.Length;
             }
-            messageLogProcessorLoop.EnqueueIncomingItem(messageCorrelation);
+
+            _messageLogProcessingLoop.EnqueueIncomingItem(messageCorrelation);
         }
 
         private static void CaptureHttpStatusCode(Message reply, MessageLogEntry messageLogEntry)

@@ -11,7 +11,8 @@ namespace WCFESMessageLogging
     {
         public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
         {
-            endpointDispatcher.DispatchRuntime.MessageInspectors.Add(new MessageCapture());
+            endpointDispatcher.DispatchRuntime.MessageInspectors.Add(
+                new MessageCaptureBehaviorExtensionElement().CreateMessageCapture());
         }
 
         public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)

@@ -13,9 +13,9 @@ namespace WCFESMessageLogging
     {
         private readonly MessageLogEntryService _messageLogEntryService;
 
-        public MessageCapture()
+        public MessageCapture(MessageCaptureSettings settings)
         {
-            _messageLogEntryService = new MessageLogEntryService();
+            _messageLogEntryService = new MessageLogEntryService(settings);
         }
 
         public object AfterReceiveRequest(ref Message request, IClientChannel channel, InstanceContext instanceContext)

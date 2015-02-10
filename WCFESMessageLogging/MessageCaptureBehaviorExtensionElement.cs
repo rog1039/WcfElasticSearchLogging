@@ -6,9 +6,23 @@ namespace WCFESMessageLogging
 {
     public class MessageCaptureBehaviorExtensionElement : BehaviorExtensionElement
     {
-        protected override object CreateBehavior() => new MessageCapture();
+        public MessageCapture CreateMessageCapture() => new MessageCapture(GetMessageCaptureSettings());
 
-        public override Type BehaviorType => typeof(MessageCapture);
+
+        protected override object CreateBehavior() => new MessageCaptureBehavior();
+
+        public override Type BehaviorType
+        {
+            get { return BehaviorType2(); }
+        }
+
+        public Type BehaviorType2()
+        {
+            var asd = this["hungMessageThreadCycleWaitTime"];
+            var asdfas = (string)this["elasticSearchIndexName"];;
+            var tasdf = HungMessageThreadCycleWaitTime;
+            return typeof (MessageCaptureBehavior);
+        }
 
 
         private MessageCaptureSettings GetMessageCaptureSettings()
@@ -50,7 +64,7 @@ namespace WCFESMessageLogging
         [ConfigurationProperty("hungMessageThreadCycleWaitTime")]
         public TimeSpan HungMessageThreadCycleWaitTime => (TimeSpan?)this["hungMessageThreadCycleWaitTime"] ?? defaultHungMessageThreadCycleWaitTime;
 
-        [ConfigurationProperty("maxHangoutTimeForMessage", DefaultValue = true)]
+        [ConfigurationProperty("maxHangoutTimeForMessage")]
         public TimeSpan MaxHangoutTimeForMessage => (TimeSpan?)this["maxHangoutTimeForMessage"] ?? defaultMaxHangoutTimeForMessage;
 
         private static readonly TimeSpan defaultHungMessageThreadCycleWaitTime = TimeSpan.FromSeconds(30);
