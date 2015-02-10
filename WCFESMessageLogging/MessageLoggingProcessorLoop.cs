@@ -1,79 +1,65 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Nest;
+using Seterlund.CodeGuard;
 
 namespace WCFESMessageLogging
 {
-    public class MessageCaptureSettings
-    {
-        public Uri ElasticSearchUri { get; set; }
-        public string IndexName { get; set; }
-        public string TypeName { get; set; }
-        public int NumberOfMessageLoggingThreads { get; set; }
-        public int MessageLoggingTimeoutInSeconds { get; set; }
-        public bool EnableMessageLoggingTimout { get; set; }
-    }
-
     public class MessageLoggingProcessorLoop
     {
-        Uri elasticSearchNode = new Uri("http://ws2012r2kibana4:9200");
-        private IOperationHandler _operationHandler;
+        private readonly MessageCaptureSettings _settings;
+        private readonly ElasticClient _elasticClient;
+
+        private readonly Queue<MessageLogEntry> _incomingItemQueue = new Queue<MessageLogEntry>();
         private readonly Dictionary<Guid, MessageLogEntry> _currentRunningRequests = new Dictionary<Guid, MessageLogEntry>();
 
-        private Semaphore _workWaiting;
-        private ManualResetEvent _pollingEvent;
-        private Queue<MessageLogEntry> _incomingItemQueue;
-        private List<Thread> _threads;
 
-        private long _dumpstartTicks;
-        private string _dumpIncomingMessage;
-        private int _dumpCount;
-        private TimeSpan hungMessageThreadCycleWaitTime = TimeSpan.FromSeconds(30);
-        private TimeSpan maxHangoutTimeForMessage = TimeSpan.FromMinutes(5);
-        private MessageLogEntry _hungMessage;
-        private ElasticClient elasticClient;
-
-        public MessageLoggingProcessorLoop(int numThreads)
+        private readonly List<Thread> _threads;
+        private readonly Semaphore _workWaiting = new Semaphore(0, int.MaxValue);
+        private readonly ManualResetEvent _pollingEvent = new ManualResetEvent(false);
+        
+        public MessageLoggingProcessorLoop(MessageCaptureSettings settings)
         {
-            var settings = new ConnectionSettings(
-                elasticSearchNode,
-                defaultIndex: "another-index"
-                );
-            elasticClient = new ElasticClient(settings);
+            Guard.That(() => settings.NumberOfMessageLoggingThreads).IsGreaterThan(0);
 
-            if (numThreads <= 0)
-                throw new ArgumentOutOfRangeException("numThreads");
+            _settings = settings;
 
-            _threads = new List<Thread>(numThreads);
-            _incomingItemQueue = new Queue<MessageLogEntry>();
-            _workWaiting = new Semaphore(0, int.MaxValue);
+            _elasticClient = new ElasticClient(new ConnectionSettings(
+                _settings.ElasticSearchUri,
+                _settings.IndexName));
 
-            _dumpCount = 0;
-
-            for (int i = 0; i < numThreads; i++)
+            _threads = new List<Thread>(_settings.NumberOfMessageLoggingThreads);
+            
+            StartProcessingLoopThreads();
+            StartHungMessageThread();
+        }
+        
+        private void StartProcessingLoopThreads()
+        {
+            for (int i = 0; i < _settings.NumberOfMessageLoggingThreads; i++)
             {
-                Thread t = new Thread(Run);
-                t.Name = "RunMethod Thread";
+                Thread t = new Thread(NormalMessageLogEntryProcessingLoop);
+                t.Name = "MessageLoggingProcessorLoop Thread " + i.ToString();
                 t.IsBackground = true;
                 _threads.Add(t);
                 t.Start();
             }
         }
-
-        public void StartHangDumpThread()
+        private void StartHungMessageThread()
         {
-            _pollingEvent = new ManualResetEvent(false);
-
-            Thread t = new Thread(HangDumpThread);
-            t.IsBackground = true;
-            _threads.Add(t);
-            t.Start();
+            if (_settings.EnableMessageLoggingTimout)
+            {
+                Thread t = new Thread(HungMessageLogEntryProcessingLoop);
+                t.IsBackground = true;
+                _threads.Add(t);
+                t.Start();
+            }
         }
-
 
         public void EnqueueIncomingItem(MessageLogEntry messageLogEntry)
         {
@@ -82,27 +68,8 @@ namespace WCFESMessageLogging
 
             _workWaiting.Release();
         }
-
-        private MessageLogEntry DequeueIncomingItem()
-        {
-            MessageLogEntry item = null;
-
-            while (item == null)
-            {
-                lock (_incomingItemQueue)
-                {
-                    if (_incomingItemQueue.Count > 0)
-                    {
-                        item = _incomingItemQueue.Dequeue();
-                        break;
-                    }
-                }
-                _workWaiting.WaitOne();
-            }
-            return item;
-        }
-
-        private void Run()
+        
+        private void NormalMessageLogEntryProcessingLoop()
         {
             try
             {
@@ -112,7 +79,7 @@ namespace WCFESMessageLogging
 
                     if (item.EndTime.HasValue)
                     {
-                        ProcessEndingMessage(item);
+                        IndexEndingMessage(item);
 
                         lock (_currentRunningRequests)
                         {
@@ -133,46 +100,62 @@ namespace WCFESMessageLogging
                 // ignored
             }
         }
-
-        private void ProcessEndingMessage(MessageLogEntry item)
+        private MessageLogEntry DequeueIncomingItem()
         {
-            //Send Message to ElasticSearch.
-            var indexResponse = elasticClient.Index(item, i => i.Index("my-index").Type("my-type").Id(item.MessageId.ToString()));
+            MessageLogEntry item = null;
+
+            while (item == null)
+            {
+                lock (_incomingItemQueue)
+                {
+                    if (_incomingItemQueue.Count > 0)
+                    {
+                        item = _incomingItemQueue.Dequeue();
+                        break;
+                    }
+                }
+                _workWaiting.WaitOne();
+            }
+            return item;
         }
 
-        private void ProcessHungMessage(MessageLogEntry hungMessage)
+        private void IndexEndingMessage(MessageLogEntry messageLogEntry)
         {
-            //Send message to ElasticSearch.
-            elasticClient.Index(hungMessage);
+            var indexResponse = _elasticClient.Index(messageLogEntry, i => i.Index("my-index").Type("my-type").Id(messageLogEntry.MessageId.ToString()));
         }
-
-
-        private void HangDumpThread()
+        private void IndexHungMessage(MessageLogEntry messageLogEntry)
         {
+            var indexResponse = _elasticClient.Index(messageLogEntry, i => i.Index("my-index").Type("my-type").Id(messageLogEntry.MessageId.ToString()));
+        }
+        
+        private void HungMessageLogEntryProcessingLoop()
+        {
+            MessageLogEntry hungMessage = null;
             try
             {
                 while (true)
                 {
-                    _pollingEvent.WaitOne(hungMessageThreadCycleWaitTime);
+                    _pollingEvent.WaitOne(_settings.HungMessageThreadCycleWaitTime);
                     lock (_currentRunningRequests)
                     {
                         foreach (var correlationMessage in _currentRunningRequests.Values)
                         {
-                            if (correlationMessage.StartTime + maxHangoutTimeForMessage < DateTime.Now)
+                            if (correlationMessage.StartTime + _settings.MaxHangoutTimeForMessage < DateTime.UtcNow)
                             {
-                                _hungMessage = correlationMessage;
+                                hungMessage = correlationMessage;
                                 break;
                             }
                         }
                     }
-                    if (_hungMessage != null)
+                    if (hungMessage != null)
                     {
-                        ProcessHungMessage(_hungMessage);
+                        hungMessage.MarkOperationAsHung();
+                        IndexHungMessage(hungMessage);
                         lock (_currentRunningRequests)
                         {
-                            _currentRunningRequests.Remove(_hungMessage.MessageId);
+                            _currentRunningRequests.Remove(hungMessage.MessageId);
                         }
-                        _hungMessage = null;
+                        hungMessage = null;
                     }
                 }
             }

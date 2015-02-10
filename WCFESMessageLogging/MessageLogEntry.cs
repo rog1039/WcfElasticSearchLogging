@@ -12,10 +12,10 @@ namespace WCFESMessageLogging
             Headers = new Dictionary<string, string>();
         }
 
-        public DateTime StartTime { get; set; }
-        public DateTime? EndTime { get; set; }
-        public Guid MessageId { get; set; }
-        public string RequestUri { get; set; }
+        public DateTime StartTime { get; private set; }
+        public DateTime? EndTime { get; private set; }
+        public Guid MessageId { get; }
+        public string RequestUri { get; }
         public string HttpMethod { get; set; }
         public string RequestBody { get; set; }
         public long RequestSize { get; set; }
@@ -23,15 +23,21 @@ namespace WCFESMessageLogging
         public string OperationName { get; set; }
         public string HttpResponseStatusCode { get; set; }
         public int HttpResponseStatusCodeInt { get; set; }
-        public TimeSpan? OperationDuration => GetOperationDuration();
-        public double? DurationInMilliseconds => GetOperationDuration()?.TotalMilliseconds;
-        public Dictionary<string, string> Headers { get; set; }
+        public TimeSpan? OperationDuration => EndTime - StartTime;
+        public double? DurationInMilliseconds => OperationDuration?.TotalMilliseconds;
+        public Dictionary<string, string> Headers { get; }
         public DateTime @timestamp => StartTime;
+        public bool MessageHung { get; private set; }
 
-        public void MarkOperationAsStarted() => StartTime = DateTime.Now;
 
-        public void MarkOperationAsFinished() => EndTime = DateTime.Now;
+        public void MarkOperationAsStarted() => StartTime = DateTime.UtcNow;
 
-        private TimeSpan? GetOperationDuration() => EndTime - StartTime;
+        public void MarkOperationAsFinished() => EndTime = DateTime.UtcNow;
+        public void MarkOperationAsHung()
+        {
+            MessageHung = true;
+            EndTime = DateTime.UtcNow;
+        }
+
     }
 }
