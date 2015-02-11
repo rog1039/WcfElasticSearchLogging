@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>WCFESMessageLogging</id>
+    <version>1.0.0.0</version>
+    <title>WCF to Elastic Search</title>
+    <authors>Paul Rogero</authors>
+    <owners>Paul Rogero</owners>
+    <projectUrl>httphttps://github.com/rog1039/WcfElasticSearchLogging</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Logs WCF related information to elastic search on every WCF call.</description>
+    <releaseNotes>Initial package.</releaseNotes>
+    <copyright>Copyright 2015</copyright>
+    <tags></tags>
+  </metadata>
+</package>
