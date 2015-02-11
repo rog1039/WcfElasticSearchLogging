@@ -26,7 +26,7 @@ namespace WCFESMessageLogging
 
         public void BeforeSendReply(ref Message reply, object correlationState)
         {
-            _messageLogEntryService.FinishMessageLogEntry(ref reply, correlationState);
+            _messageLogEntryService.FinishMessageLogEntry(ref reply, correlationState);            
         }
     }
 }

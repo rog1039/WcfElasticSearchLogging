@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
@@ -15,14 +16,14 @@ namespace WCFESMessageLogging
         private readonly MessageCaptureSettings _settings;
         private readonly ElasticClient _elasticClient;
 
-        private readonly Queue<MessageLogEntry> _incomingItemQueue = new Queue<MessageLogEntry>();
-        private readonly Dictionary<Guid, MessageLogEntry> _currentRunningRequests = new Dictionary<Guid, MessageLogEntry>();
+        private readonly BlockingCollection<MessageLogEntry> _incomingItemQueue = new BlockingCollection<MessageLogEntry>();
+        private readonly ConcurrentDictionary<Guid, MessageLogEntry> _currentRunningRequests = new ConcurrentDictionary<Guid, MessageLogEntry>();
 
 
         private readonly List<Thread> _threads;
         private readonly Semaphore _workWaiting = new Semaphore(0, int.MaxValue);
         private readonly ManualResetEvent _pollingEvent = new ManualResetEvent(false);
-        
+
         public MessageLoggingProcessorLoop(MessageCaptureSettings settings)
         {
             Guard.That(() => settings.NumberOfMessageLoggingThreads).IsGreaterThan(0);
@@ -34,11 +35,11 @@ namespace WCFESMessageLogging
                 _settings.IndexName));
 
             _threads = new List<Thread>(_settings.NumberOfMessageLoggingThreads);
-            
+
             StartProcessingLoopThreads();
             StartHungMessageThread();
         }
-        
+
         private void StartProcessingLoopThreads()
         {
             for (int i = 0; i < _settings.NumberOfMessageLoggingThreads; i++)
@@ -63,12 +64,12 @@ namespace WCFESMessageLogging
 
         public void EnqueueIncomingItem(MessageLogEntry messageLogEntry)
         {
-            lock (_incomingItemQueue)
-                _incomingItemQueue.Enqueue(messageLogEntry);
+            if (_incomingItemQueue.Count > 10000)
+                return;
 
-            _workWaiting.Release();
+            _incomingItemQueue.TryAdd(messageLogEntry);
         }
-        
+
         private void NormalMessageLogEntryProcessingLoop()
         {
             try
@@ -80,18 +81,11 @@ namespace WCFESMessageLogging
                     if (item.EndTime.HasValue)
                     {
                         IndexEndingMessage(item);
-
-                        lock (_currentRunningRequests)
-                        {
-                            _currentRunningRequests.Remove(item.MessageId);
-                        }
+                        _currentRunningRequests.Remove(item.MessageId);
                     }
                     else
                     {
-                        lock (_currentRunningRequests)
-                        {
-                            _currentRunningRequests.Add(item.MessageId, item);
-                        }
+                        _currentRunningRequests.TryAdd(item.MessageId, item);
                     }
                 }
             }
@@ -102,21 +96,8 @@ namespace WCFESMessageLogging
         }
         private MessageLogEntry DequeueIncomingItem()
         {
-            MessageLogEntry item = null;
-
-            while (item == null)
-            {
-                lock (_incomingItemQueue)
-                {
-                    if (_incomingItemQueue.Count > 0)
-                    {
-                        item = _incomingItemQueue.Dequeue();
-                        break;
-                    }
-                }
-                _workWaiting.WaitOne();
-            }
-            return item;
+            var messageLogEntry = _incomingItemQueue.Take();
+            return messageLogEntry;
         }
 
         private void IndexEndingMessage(MessageLogEntry messageLogEntry)
@@ -127,7 +108,7 @@ namespace WCFESMessageLogging
         {
             var indexResponse = _elasticClient.Index(messageLogEntry, i => i.Index("my-index").Type("my-type").Id(messageLogEntry.MessageId.ToString()));
         }
-        
+
         private void HungMessageLogEntryProcessingLoop()
         {
             MessageLogEntry hungMessage = null;
@@ -163,6 +144,15 @@ namespace WCFESMessageLogging
             {
                 // ignored
             }
+        }
+    }
+    public static class ConcurrentDictionaryEx
+    {
+        public static bool Remove<TKey, TValue>(
+          this ConcurrentDictionary<TKey, TValue> self, TKey key)
+        {
+            TValue ignored;
+            return self.TryRemove(key, out ignored);
         }
     }
 }
