@@ -9,16 +9,7 @@ namespace WCFESMessageLogging
         protected override object CreateBehavior() => new MessageCaptureBehavior(GetMessageCaptureSettings());
 
         public override Type BehaviorType => typeof (MessageCaptureBehavior);
-
-        //public Type BehaviorType2()
-        //{
-        //    var asd = this["hungMessageThreadCycleWaitTime"];
-        //    var asdfas = ElasticSearchIndexName;
-        //    var tasdf = HungMessageThreadCycleWaitTime;
-        //    return typeof (MessageCaptureBehavior);
-        //}
-
-
+        
         private MessageCaptureSettings GetMessageCaptureSettings()
         {
             MessageCaptureSettings settings = new MessageCaptureSettings()
@@ -38,18 +29,10 @@ namespace WCFESMessageLogging
 
 
         [ConfigurationProperty("elasticSearchNodeAddress", DefaultValue = "http://ws2012r2kibana4:9200")]
-        public string ElasticSearchNodeAddress
-        {
-            get { return (string)base["elasticSearchNodeAddress"]; }
-            set { base["elasticSearchNodeAddress"] = value; }
-        }
+        public string ElasticSearchNodeAddress => (string)this["elasticSearchNodeAddress"];
 
         [ConfigurationProperty("elasticSearchIndexName")]
-        public string ElasticSearchIndexName
-        {
-            get { return (string)base["elasticSearchIndexName"]; }
-            set { base["elasticSearchIndexName"] = value; }
-        }
+        public string ElasticSearchIndexName => (string)this["elasticSearchIndexName"];
 
         [ConfigurationProperty("elasticSearchDocumentType", DefaultValue = "my-type")]
         public string ElasticSearchDocumentType => (string)this["elasticSearchDocumentType"];
