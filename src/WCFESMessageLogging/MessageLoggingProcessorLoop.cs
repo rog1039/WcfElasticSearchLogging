@@ -153,8 +153,7 @@ namespace WCFESMessageLogging
 
     public static class ConcurrentDictionaryEx
     {
-        public static bool Remove<TKey, TValue>(
-          this ConcurrentDictionary<TKey, TValue> self, TKey key)
+        public static bool Remove<TKey, TValue>(this ConcurrentDictionary<TKey, TValue> self, TKey key)
         {
             TValue ignored;
             return self.TryRemove(key, out ignored);
