@@ -64,7 +64,7 @@ namespace WCFESMessageLogging
 
         public void AddMessageLogEntry(MessageLogEntry messageLogEntry)
         {
-            if (_incomingItemQueue.Count > 10000)
+            if (_incomingItemQueue.Count > 100000 || _currrentMessageLogEntries.Count > 100000)
                 return;
 
             _incomingItemQueue.TryAdd(messageLogEntry);

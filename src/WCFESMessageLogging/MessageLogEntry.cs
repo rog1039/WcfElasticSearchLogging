@@ -16,6 +16,8 @@ namespace WCFESMessageLogging
         public DateTime? EndTime { get; private set; }
         public Guid MessageId { get; }
         public string RequestUri { get; }
+        public string RemoteEndpointAddress { get; set; }
+        public int RemoteEndpointPort { get; set; }
         public string HttpMethod { get; set; }
         public string RequestBody { get; set; }
         public long RequestSize { get; set; }

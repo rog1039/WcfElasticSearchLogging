@@ -27,6 +27,8 @@ namespace WCFESMessageLogging
             ExtractOperationName(messageLogEntry);
             var h = OperationContext.Current.IncomingMessageHeaders;
 
+            CaptureRemoteEndpointAddress(request, messageLogEntry);
+
             HttpRequestMessageProperty httpReq =
                 (HttpRequestMessageProperty) request.Properties[HttpRequestMessageProperty.Name];
             messageLogEntry.HttpMethod = httpReq.Method;
@@ -46,6 +48,20 @@ namespace WCFESMessageLogging
             messageLogEntry.MarkOperationAsStarted();
             _messageLogProcessingLoop.AddMessageLogEntry(messageLogEntry);
             return messageLogEntry;
+        }
+
+        private static void CaptureRemoteEndpointAddress(Message request, MessageLogEntry messageLogEntry)
+        {
+            try
+            {
+                RemoteEndpointMessageProperty remoteEndpoint = request.Properties[RemoteEndpointMessageProperty.Name] as RemoteEndpointMessageProperty;
+                messageLogEntry.RemoteEndpointAddress = remoteEndpoint.Address;
+                messageLogEntry.RemoteEndpointPort = remoteEndpoint.Port;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
         }
 
         private static void ExtractOperationName(MessageLogEntry messageLogEntry)
