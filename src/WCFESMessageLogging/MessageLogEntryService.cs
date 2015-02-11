@@ -44,7 +44,7 @@ namespace WCFESMessageLogging
             }
 
             messageLogEntry.MarkOperationAsStarted();
-            _messageLogProcessingLoop.EnqueueIncomingItem(messageLogEntry);
+            _messageLogProcessingLoop.AddMessageLogEntry(messageLogEntry);
             return messageLogEntry;
         }
 
@@ -89,7 +89,7 @@ namespace WCFESMessageLogging
                 messageCorrelation.ResponseSize = messageToString.Length;
             }
 
-            _messageLogProcessingLoop.EnqueueIncomingItem(messageCorrelation);
+            _messageLogProcessingLoop.AddMessageLogEntry(messageCorrelation);
         }
 
         private static void CaptureHttpStatusCode(Message reply, MessageLogEntry messageLogEntry)

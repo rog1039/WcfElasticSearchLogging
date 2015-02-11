@@ -17,7 +17,7 @@ namespace WCFESMessageLogging
         private readonly ElasticClient _elasticClient;
 
         private readonly BlockingCollection<MessageLogEntry> _incomingItemQueue = new BlockingCollection<MessageLogEntry>();
-        private readonly ConcurrentDictionary<Guid, MessageLogEntry> _currentRunningRequests = new ConcurrentDictionary<Guid, MessageLogEntry>();
+        private readonly ConcurrentDictionary<Guid, MessageLogEntry> _currrentMessageLogEntries = new ConcurrentDictionary<Guid, MessageLogEntry>();
 
 
         private readonly List<Thread> _threads;
@@ -62,7 +62,7 @@ namespace WCFESMessageLogging
             }
         }
 
-        public void EnqueueIncomingItem(MessageLogEntry messageLogEntry)
+        public void AddMessageLogEntry(MessageLogEntry messageLogEntry)
         {
             if (_incomingItemQueue.Count > 10000)
                 return;
@@ -72,80 +72,85 @@ namespace WCFESMessageLogging
 
         private void NormalMessageLogEntryProcessingLoop()
         {
-            try
+            while (true)
             {
-                while (true)
+                try
                 {
-                    var item = DequeueIncomingItem();
+                    var messageLogEntry = _incomingItemQueue.Take();
 
-                    if (item.EndTime.HasValue)
+                    if (messageLogEntry.EndTime.HasValue)
                     {
-                        IndexEndingMessage(item);
-                        _currentRunningRequests.Remove(item.MessageId);
+                        ProcessEndingMessage(messageLogEntry);
                     }
                     else
                     {
-                        _currentRunningRequests.TryAdd(item.MessageId, item);
+                        _currrentMessageLogEntries.TryAdd(messageLogEntry.MessageId, messageLogEntry);
                     }
                 }
+                catch (Exception e)
+                {
+                    // ignored
+                }
+            }
+        }
+
+        private void ProcessEndingMessage(MessageLogEntry item)
+        {
+            try
+            {
+                IndexEndingMessage(item);
+                _currrentMessageLogEntries.Remove(item.MessageId);
             }
             catch (Exception e)
             {
-                // ignored
+                Console.WriteLine(e);
+                _incomingItemQueue.Add(item);
             }
-        }
-        private MessageLogEntry DequeueIncomingItem()
-        {
-            var messageLogEntry = _incomingItemQueue.Take();
-            return messageLogEntry;
         }
 
         private void IndexEndingMessage(MessageLogEntry messageLogEntry)
         {
-            var indexResponse = _elasticClient.Index(messageLogEntry, i => i.Index("my-index").Type("my-type").Id(messageLogEntry.MessageId.ToString()));
+            var indexResponse = _elasticClient.Index(messageLogEntry, i => i.Index(_settings.IndexName).Type(_settings.TypeName).Id(messageLogEntry.MessageId.ToString()));
         }
         private void IndexHungMessage(MessageLogEntry messageLogEntry)
         {
-            var indexResponse = _elasticClient.Index(messageLogEntry, i => i.Index("my-index").Type("my-type").Id(messageLogEntry.MessageId.ToString()));
+            var indexResponse = _elasticClient.Index(messageLogEntry, i => i.Index(_settings.IndexName).Type(_settings.TypeName).Id(messageLogEntry.MessageId.ToString()));
         }
 
         private void HungMessageLogEntryProcessingLoop()
         {
-            MessageLogEntry hungMessage = null;
-            try
+            while (true)
             {
-                while (true)
+                try
                 {
                     _pollingEvent.WaitOne(_settings.HungMessageThreadCycleWaitTime);
-                    lock (_currentRunningRequests)
+
+                    foreach (var hungMessageLogEntry in _currrentMessageLogEntries.Values.Where(HasMessageTakenTooLong))
                     {
-                        foreach (var correlationMessage in _currentRunningRequests.Values)
+                        try
                         {
-                            if (correlationMessage.StartTime + _settings.MaxHangoutTimeForMessage < DateTime.UtcNow)
-                            {
-                                hungMessage = correlationMessage;
-                                break;
-                            }
+                            _currrentMessageLogEntries.Remove(hungMessageLogEntry.MessageId);
+                            hungMessageLogEntry.MarkOperationAsHung();
+                            IndexHungMessage(hungMessageLogEntry);
                         }
-                    }
-                    if (hungMessage != null)
-                    {
-                        hungMessage.MarkOperationAsHung();
-                        IndexHungMessage(hungMessage);
-                        lock (_currentRunningRequests)
+                        catch (Exception e)
                         {
-                            _currentRunningRequests.Remove(hungMessage.MessageId);
+                            // ignored
                         }
-                        hungMessage = null;
                     }
                 }
-            }
-            catch
-            {
-                // ignored
+                catch (Exception e)
+                {
+                    // ignored
+                }
             }
         }
+
+
+        private bool HasMessageTakenTooLong(MessageLogEntry messageLogEntry)
+            => messageLogEntry.StartTime + _settings.MaxHangoutTimeForMessage < DateTime.UtcNow;
     }
+
     public static class ConcurrentDictionaryEx
     {
         public static bool Remove<TKey, TValue>(
