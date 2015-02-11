@@ -56,7 +56,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="IMessageCorrelationListener.cs" />
-    <Compile Include="MessageCapture.cs" />
+    <Compile Include="MessageInspector.cs" />
     <Compile Include="MessageCaptureBehavior.cs" />
     <Compile Include="MessageCaptureSettings.cs" />
     <Compile Include="MessageLogEntryService.cs" />

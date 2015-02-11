@@ -1,5 +1,8 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Configuration;
+using System.Linq;
+using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Configuration;
 using System.ServiceModel.Description;
@@ -9,16 +12,22 @@ namespace WCFESMessageLogging
 {
     public class MessageCaptureBehavior : IEndpointBehavior
     {
+        private readonly MessageCaptureSettings _settings;
+
+        public MessageCaptureBehavior(MessageCaptureSettings settings)
+        {
+            _settings = settings;
+        }
+
         public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
         {
             endpointDispatcher.DispatchRuntime.MessageInspectors.Add(
-                new MessageCaptureBehaviorExtensionElement().CreateMessageCapture());
+                new MessageInspector(_settings));
         }
 
         public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
         {
         }
-
         public void ApplyClientBehavior(ServiceEndpoint endpoint, ClientRuntime clientRuntime)
         {
         }

@@ -6,23 +6,17 @@ namespace WCFESMessageLogging
 {
     public class MessageCaptureBehaviorExtensionElement : BehaviorExtensionElement
     {
-        public MessageCapture CreateMessageCapture() => new MessageCapture(GetMessageCaptureSettings());
+        protected override object CreateBehavior() => new MessageCaptureBehavior(GetMessageCaptureSettings());
 
+        public override Type BehaviorType => typeof (MessageCaptureBehavior);
 
-        protected override object CreateBehavior() => new MessageCaptureBehavior();
-
-        public override Type BehaviorType
-        {
-            get { return BehaviorType2(); }
-        }
-
-        public Type BehaviorType2()
-        {
-            var asd = this["hungMessageThreadCycleWaitTime"];
-            var asdfas = (string)this["elasticSearchIndexName"];;
-            var tasdf = HungMessageThreadCycleWaitTime;
-            return typeof (MessageCaptureBehavior);
-        }
+        //public Type BehaviorType2()
+        //{
+        //    var asd = this["hungMessageThreadCycleWaitTime"];
+        //    var asdfas = ElasticSearchIndexName;
+        //    var tasdf = HungMessageThreadCycleWaitTime;
+        //    return typeof (MessageCaptureBehavior);
+        //}
 
 
         private MessageCaptureSettings GetMessageCaptureSettings()
@@ -44,10 +38,18 @@ namespace WCFESMessageLogging
 
 
         [ConfigurationProperty("elasticSearchNodeAddress", DefaultValue = "http://ws2012r2kibana4:9200")]
-        public string ElasticSearchNodeAddress => (string)this["elasticSearchNodeAddress"];
+        public string ElasticSearchNodeAddress
+        {
+            get { return (string)base["elasticSearchNodeAddress"]; }
+            set { base["elasticSearchNodeAddress"] = value; }
+        }
 
-        [ConfigurationProperty("elasticSearchIndexName", DefaultValue = "another-index")]
-        public string ElasticSearchIndexName => (string)this["elasticSearchIndexName"];
+        [ConfigurationProperty("elasticSearchIndexName")]
+        public string ElasticSearchIndexName
+        {
+            get { return (string)base["elasticSearchIndexName"]; }
+            set { base["elasticSearchIndexName"] = value; }
+        }
 
         [ConfigurationProperty("elasticSearchDocumentType", DefaultValue = "my-type")]
         public string ElasticSearchDocumentType => (string)this["elasticSearchDocumentType"];
@@ -62,12 +64,25 @@ namespace WCFESMessageLogging
         public bool EnableMessageLoggingTimout => (bool)this["enableMessageLoggingTimout"];
 
         [ConfigurationProperty("hungMessageThreadCycleWaitTime")]
-        public TimeSpan HungMessageThreadCycleWaitTime => (TimeSpan?)this["hungMessageThreadCycleWaitTime"] ?? defaultHungMessageThreadCycleWaitTime;
+        public TimeSpan HungMessageThreadCycleWaitTime =>
+            GetTimespanValueOrUseDefault((TimeSpan) this["hungMessageThreadCycleWaitTime"],
+                defaultHungMessageThreadCycleWaitTime);
 
         [ConfigurationProperty("maxHangoutTimeForMessage")]
-        public TimeSpan MaxHangoutTimeForMessage => (TimeSpan?)this["maxHangoutTimeForMessage"] ?? defaultMaxHangoutTimeForMessage;
+        public TimeSpan MaxHangoutTimeForMessage =>
+            GetTimespanValueOrUseDefault((TimeSpan)this["maxHangoutTimeForMessage"],
+                defaultMaxHangoutTimeForMessage);
 
         private static readonly TimeSpan defaultHungMessageThreadCycleWaitTime = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan defaultMaxHangoutTimeForMessage = TimeSpan.FromMinutes(5);
+
+        
+        private static TimeSpan GetTimespanValueOrUseDefault(TimeSpan timespan, TimeSpan defaultValue)
+        {
+            if (timespan.Ticks == 0)
+                return defaultValue;
+
+            return timespan;
+        }
     }
 }

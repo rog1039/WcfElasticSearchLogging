@@ -9,11 +9,11 @@ using System.Xml;
 
 namespace WCFESMessageLogging
 {
-    public class MessageCapture : IDispatchMessageInspector
+    public class MessageInspector : IDispatchMessageInspector
     {
         private readonly MessageLogEntryService _messageLogEntryService;
 
-        public MessageCapture(MessageCaptureSettings settings)
+        public MessageInspector(MessageCaptureSettings settings)
         {
             _messageLogEntryService = new MessageLogEntryService(settings);
         }
