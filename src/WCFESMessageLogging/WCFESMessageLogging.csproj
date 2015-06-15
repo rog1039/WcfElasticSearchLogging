@@ -55,7 +55,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="IMessageCorrelationListener.cs" />
     <Compile Include="MessageInspector.cs" />
     <Compile Include="MessageCaptureBehavior.cs" />
     <Compile Include="MessageCaptureSettings.cs" />

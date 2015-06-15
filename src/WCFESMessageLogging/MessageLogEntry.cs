@@ -33,7 +33,6 @@ namespace WCFESMessageLogging
 
 
         public void MarkOperationAsStarted() => StartTime = DateTime.UtcNow;
-
         public void MarkOperationAsFinished() => EndTime = DateTime.UtcNow;
         public void MarkOperationAsHung()
         {

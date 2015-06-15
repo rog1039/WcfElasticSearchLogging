@@ -1,10 +1,4 @@
-using System;
-using System.Collections.ObjectModel;
-using System.Configuration;
-using System.Linq;
-using System.ServiceModel;
 using System.ServiceModel.Channels;
-using System.ServiceModel.Configuration;
 using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
 

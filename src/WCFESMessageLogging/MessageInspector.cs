@@ -1,11 +1,6 @@
-using System;
-using System.IO;
-using System.Runtime.Serialization.Json;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Dispatcher;
-using System.Text;
-using System.Xml;
 
 namespace WCFESMessageLogging
 {
